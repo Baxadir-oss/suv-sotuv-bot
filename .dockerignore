@@ -1,0 +1,10 @@
+.env
+*.db
+backups/
+__pycache__/
+*.pyc
+.git/
+.venv/
+venv/
+node_modules/
+webapp/dist/
