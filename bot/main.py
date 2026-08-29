@@ -18,6 +18,7 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
@@ -70,6 +71,15 @@ async def _on_startup(bot: Bot) -> None:
     else:
         await bot.delete_webhook(drop_pending_updates=True)
         logger.info("Webhook o'chirildi — polling rejimida ishga tushmoqda")
+
+    # Doimiy Mini App tugmasi — chat pastida, xabar yozish maydonining
+    # yonida turadi (masalan boshqa botlardagi "Play now!" tugmasi kabi).
+    # Bosilganda to'g'ridan-to'g'ri Mini App ochiladi, /start yozish shart emas.
+    if config.webapp_url:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="Ochish", web_app=WebAppInfo(url=config.webapp_url))
+        )
+        logger.info("Doimiy Mini App tugmasi o'rnatildi")
 
 
 async def _on_shutdown(bot: Bot) -> None:
@@ -154,3 +164,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
