@@ -26,4 +26,16 @@ export const api = {
     request("/api/order", { method: "POST", body: JSON.stringify({ items }) }),
   reports: (start, end) => request(`/api/reports?start=${start}&end=${end}`),
   searchShops: (q) => request(`/api/shops/search?q=${encodeURIComponent(q)}`),
+
+  agentProducts: () => request("/api/agent/products"),
+  createAgentProduct: (data) =>
+    request("/api/agent/products", { method: "POST", body: JSON.stringify(data) }),
+  updateAgentProduct: (id, data) =>
+    request(`/api/agent/products/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  reorderAgentProducts: (order) =>
+    request("/api/agent/products/reorder", { method: "POST", body: JSON.stringify({ order }) }),
+
+  broadcastStatus: () => request("/api/agent/broadcast/status"),
+  submitBroadcast: (data) =>
+    request("/api/agent/broadcast", { method: "POST", body: JSON.stringify(data) }),
 };
