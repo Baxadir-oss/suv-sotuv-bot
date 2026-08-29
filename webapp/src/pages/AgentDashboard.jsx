@@ -12,6 +12,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { Droplets } from "lucide-react";
 import { api } from "../api";
 import { DropLoader } from "../components/Loaders";
 
@@ -93,52 +94,56 @@ export default function AgentDashboard() {
             </div>
           </div>
 
-          <div className="chart-card">
-            <div className="chart-title">Kunlik daromad tendensiyasi</div>
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={data.daily}>
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} width={40} />
-                <Tooltip formatter={(v) => `${Number(v).toLocaleString("ru-RU")} so'm`} />
-                <Line type="monotone" dataKey="total" stroke="#0EA5E9" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {data.top_shops?.length > 0 && (
-            <div className="chart-card">
-              <div className="chart-title">Eng faol do'konlar</div>
-              <ResponsiveContainer width="100%" height={Math.max(120, data.top_shops.length * 34)}>
-                <BarChart data={data.top_shops} layout="vertical" margin={{ left: 8 }}>
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="shop_name" type="category" width={90} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v) => `${Number(v).toLocaleString("ru-RU")} so'm`} />
-                  <Bar dataKey="total" fill="#0369A1" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {data.totals.orders_count === 0 ? (
+            <div className="chart-card" style={{ textAlign: "center", padding: "32px 16px" }}>
+              <Droplets size={28} color="#7DD3FC" style={{ marginBottom: 8 }} />
+              <div className="hint">Bu oraliqda hali buyurtma yo'q.</div>
+              <div className="hint">Birinchi buyurtma tushishi bilan bu yerda grafik paydo bo'ladi.</div>
             </div>
-          )}
+          ) : (
+            <>
+              <div className="chart-card">
+                <div className="chart-title">Kunlik daromad tendensiyasi</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={data.daily}>
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} width={40} />
+                    <Tooltip formatter={(v) => `${Number(v).toLocaleString("ru-RU")} so'm`} />
+                    <Line type="monotone" dataKey="total" stroke="#0EA5E9" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
 
-          {data.top_products?.length > 0 && (
-            <div className="chart-card">
-              <div className="chart-title">Mahsulotlar ulushi</div>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={data.top_products}
-                    dataKey="quantity"
-                    nameKey="name"
-                    innerRadius={40}
-                    outerRadius={70}
-                  >
-                    {data.top_products.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+              {data.top_shops?.length > 0 && (
+                <div className="chart-card">
+                  <div className="chart-title">Eng faol do'konlar</div>
+                  <ResponsiveContainer width="100%" height={Math.max(120, data.top_shops.length * 34)}>
+                    <BarChart data={data.top_shops} layout="vertical" margin={{ left: 8 }}>
+                      <XAxis type="number" hide />
+                      <YAxis dataKey="shop_name" type="category" width={90} tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(v) => `${Number(v).toLocaleString("ru-RU")} so'm`} />
+                      <Bar dataKey="total" fill="#0369A1" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {data.top_products?.length > 0 && (
+                <div className="chart-card">
+                  <div className="chart-title">Mahsulotlar ulushi</div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={data.top_products} dataKey="quantity" nameKey="name" innerRadius={40} outerRadius={70}>
+                        {data.top_products.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
