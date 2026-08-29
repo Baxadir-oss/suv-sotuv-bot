@@ -31,17 +31,15 @@ def shop_main_menu(lang: str, webapp_path: str = "") -> InlineKeyboardMarkup:
 
 
 def agent_main_menu(lang: str = "uz") -> InlineKeyboardMarkup:
-    dashboard_url = f"{config.webapp_url}?view=agent" if config.webapp_url else None
-    rows = [
-        [InlineKeyboardButton(text="➕ Yangi do'kon", callback_data="agent:register")],
-        [InlineKeyboardButton(text="📦 Mahsulotlar", callback_data="agent:products")],
-        [InlineKeyboardButton(text="📢 Reklama", callback_data="agent:broadcast")],
-        [InlineKeyboardButton(text="🔎 Do'konlarni qidirish", callback_data="agent:search")],
-        [InlineKeyboardButton(text="📊 Hisobot (tezkor)", callback_data="agent:reports")],
-    ]
-    if dashboard_url:
-        rows.append([InlineKeyboardButton(text="📊 Hisobotlar (Mini App)", web_app=WebAppInfo(url=dashboard_url))])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    """
+    Agentning asosiy menyusi endi juda qisqa: faqat "Yangi do'kon" shu yerda
+    qoladi, chunki rasm va lokatsiya yuborish chatda ancha ishonchli ishlaydi.
+    Mahsulotlar, Reklama, Qidiruv, Hisobot — hammasi endi doimiy Mini App
+    tugmasi orqali ochiladigan yagona ilova ichida (webapp/src/App.jsx).
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="➕ Yangi do'kon ro'yxatga olish", callback_data="agent:register")]]
+    )
 
 
 def request_location_keyboard(lang: str) -> ReplyKeyboardMarkup:
@@ -80,3 +78,4 @@ def broadcast_template_keyboard(lang: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=t(lang, "broadcast_template_reminder"), callback_data="bcast:reminder")],
         ]
     )
+    
