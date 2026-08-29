@@ -5,6 +5,7 @@ sharoitida bitta jarayon yetarli.
 """
 from __future__ import annotations
 
+import base64
 import datetime as dt
 
 from aiohttp import web
@@ -14,10 +15,17 @@ from sqlalchemy.orm import selectinload
 from bot.config import config
 from bot.database.db import async_session_factory
 from bot.database.models import Order, Product, Shop
-from bot.services import order_service, reports_service
+from bot.services import broadcast_service, order_service, reports_service
 from bot.webapp_api.auth import InvalidInitData, validate_init_data
 
 routes = web.RouteTableDef()
+
+
+def _decode_base64_image(data: str) -> bytes:
+    """'data:image/jpeg;base64,....' yoki xom base64 satrni bytega aylantiradi."""
+    if "," in data and data.strip().startswith("data:"):
+        data = data.split(",", 1)[1]
+    return base64.b64decode(data)
 
 
 def _auth_user(request: web.Request) -> dict:
@@ -184,3 +192,139 @@ async def api_photo(request: web.Request) -> web.StreamResponse:
         raise web.HTTPNotFound(text="Rasm topilmadi")
 
     return web.Response(body=file_bytes.read(), content_type="image/jpeg")
+
+
+# ---------- 6-bo'lim: mahsulotlar — Mini App'dagi "Mahsulotlar" bo'limi ----------
+
+
+def _product_json(p: Product) -> dict:
+    return {
+        "id": p.id,
+        "name": p.name,
+        "price": p.price,
+        "unit": p.unit,
+        "is_available": p.is_available,
+        "sort_order": p.sort_order,
+        "photo_url": f"/api/photo/{p.photo_file_id}" if p.photo_file_id else None,
+    }
+
+
+@routes.get("/api/agent/products")
+async def api_agent_products(request: web.Request) -> web.Response:
+    """Katalogdan farqli o'laroq — yashiringan mahsulotlarni ham ko'rsatadi (agent boshqaruvi uchun)."""
+    _require_agent(request)
+    async with async_session_factory() as session:
+        result = await session.execute(select(Product).order_by(Product.sort_order, Product.id))
+        products = list(result.scalars())
+    return web.json_response([_product_json(p) for p in products])
+
+
+@routes.post("/api/agent/products")
+async def api_agent_create_product(request: web.Request) -> web.Response:
+    user = _require_agent(request)
+    body = await request.json()
+
+    name = (body.get("name") or "").strip()
+    unit = (body.get("unit") or "").strip()
+    try:
+        price = float(body.get("price"))
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest(text="Narx noto'g'ri")
+    if not name or not unit:
+        raise web.HTTPBadRequest(text="Nomi va birligi kerak")
+
+    photo_file_id = None
+    if body.get("photo_base64"):
+        photo_bytes = _decode_base64_image(body["photo_base64"])
+        photo_file_id = await broadcast_service.upload_photo_via_bot(request.app["bot"], user["id"], photo_bytes)
+
+    async with async_session_factory() as session:
+        result = await session.execute(select(Product.sort_order).order_by(Product.sort_order.desc()).limit(1))
+        max_order = result.scalar_one_or_none() or 0
+        product = Product(name=name, price=price, unit=unit, photo_file_id=photo_file_id, sort_order=max_order + 1)
+        session.add(product)
+        await session.commit()
+        await session.refresh(product)
+
+    return web.json_response(_product_json(product))
+
+
+@routes.patch("/api/agent/products/{product_id}")
+async def api_agent_update_product(request: web.Request) -> web.Response:
+    user = _require_agent(request)
+    product_id = int(request.match_info["product_id"])
+    body = await request.json()
+
+    async with async_session_factory() as session:
+        product = await session.get(Product, product_id)
+        if product is None:
+            raise web.HTTPNotFound(text="Mahsulot topilmadi")
+
+        if "name" in body:
+            product.name = body["name"].strip()
+        if "unit" in body:
+            product.unit = body["unit"].strip()
+        if "price" in body:
+            try:
+                product.price = float(body["price"])
+            except (TypeError, ValueError):
+                raise web.HTTPBadRequest(text="Narx noto'g'ri")
+        if "is_available" in body:
+            product.is_available = bool(body["is_available"])
+        if body.get("photo_base64"):
+            photo_bytes = _decode_base64_image(body["photo_base64"])
+            product.photo_file_id = await broadcast_service.upload_photo_via_bot(
+                request.app["bot"], user["id"], photo_bytes
+            )
+
+        await session.commit()
+        await session.refresh(product)
+
+    return web.json_response(_product_json(product))
+
+
+@routes.post("/api/agent/products/reorder")
+async def api_agent_reorder_products(request: web.Request) -> web.Response:
+    """Body: {"order": [product_id, product_id, ...]} — shu tartibda sort_order beriladi."""
+    _require_agent(request)
+    body = await request.json()
+    order = body.get("order", [])
+
+    async with async_session_factory() as session:
+        for index, product_id in enumerate(order):
+            product = await session.get(Product, product_id)
+            if product:
+                product.sort_order = index
+        await session.commit()
+
+    return web.json_response({"status": "ok"})
+
+
+# ---------- 7/16-bo'lim: reklama — Mini App'dagi "Reklama" bo'limi ----------
+
+
+@routes.get("/api/agent/broadcast/status")
+async def api_broadcast_status(request: web.Request) -> web.Response:
+    _require_agent(request)
+    remaining = await broadcast_service.days_until_next_allowed()
+    return web.json_response({"can_send": remaining is None, "days_remaining": remaining})
+
+
+@routes.post("/api/agent/broadcast")
+async def api_agent_broadcast(request: web.Request) -> web.Response:
+    user = _require_agent(request)
+    body = await request.json()
+
+    template_type = body.get("template_type", "new")
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise web.HTTPBadRequest(text="Matn kerak")
+
+    photo_file_id = None
+    if body.get("photo_base64"):
+        photo_bytes = _decode_base64_image(body["photo_base64"])
+        photo_file_id = await broadcast_service.upload_photo_via_bot(request.app["bot"], user["id"], photo_bytes)
+
+    result = await broadcast_service.submit_broadcast(request.app["bot"], template_type, text, photo_file_id)
+    return web.json_response(result)
+        
