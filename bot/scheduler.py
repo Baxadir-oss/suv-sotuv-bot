@@ -55,7 +55,7 @@ async def _monthly_report_job(bot: Bot) -> None:
 
 async def _process_queued_broadcasts(bot: Bot) -> None:
     """Vaqt oynasidan tashqarida navbatga qo'yilgan reklamalarni tekshiradi (7-bo'lim)."""
-    from bot.handlers.agent.broadcast import dispatch_broadcast  # aylanma import'dan qochish uchun shu yerda
+    from bot.services.broadcast_service import dispatch_broadcast  # aylanma import'dan qochish uchun shu yerda
 
     now = dt.datetime.utcnow()
     async with async_session_factory() as session:
@@ -76,3 +76,4 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler.add_job(_process_queued_broadcasts, CronTrigger(minute="*/30"), args=[bot])
 
     return scheduler
+   
